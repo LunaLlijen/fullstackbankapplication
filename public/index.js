@@ -6,7 +6,7 @@ function Spa() {
         <NavBar/>     
           <div className="container" style={{padding: "10px"}}>
             <Route path="/" exact component={Home} />
-            <Route path="/CreateAccount/" component={CreateAccount} />
+            <Route path="/createaccount/" component={CreateAccount} />
             <Route path="/login/" component={Login} />
             <Route path="/deposit/" component={Deposit} />
             <Route path="/withdraw/" component={Withdraw} />
