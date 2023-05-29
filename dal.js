@@ -1,95 +1,120 @@
-const MongoClient = require("mongodb").MongoClient;
+const { MongoClient } = require("mongodb");
 const url = 'mongodb+srv://Jenni:Mongo1988@fullbank.kyp8jiz.mongodb.net/?retryWrites=true&w=majority';
+const dbName = "Fullbank";
+
 let db = null;
 
-//connect to mongodb
-MongoClient.connect(url, { useUnifiedTopology: true })
-  .then((client) => {
-    db = client.db("Fullbank");
+// Connect to MongoDB
+async function connectToDB() {
+  try {
+    const client = await MongoClient.connect(url, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    db = client.db(dbName);
     console.log("Successfully connected to MongoDB!");
-  })
-  .catch(console.error);
+  } catch (error) {
+    console.error("Failed to connect to MongoDB:", error);
+  }
+};
 
-//create user accounts
+// Wait for the connection to be established before using the database
+function withDB(callback) {
+  if (db) {
+    callback(db);
+  } else {
+    setTimeout(() => withDB(callback), 100);
+  }
+};
+
+// Create user accounts
 function create(name, email, password) {
   return new Promise((resolve, reject) => {
-    const collection = db.collection("users");
-    const doc = { name, email, password, balance: 0 };
-    collection.insertOne(doc, { w: 1 }, function (err, result) {
-      err ? reject(err) : resolve(doc);
+    withDB((db) => {
+      const collection = db.collection("users");
+      const doc = { name, email, password, balance: 0 };
+      collection.insertOne(doc, { w: 1 }, function (err, result) {
+        err ? reject(err) : resolve(doc);
+      });
     });
   });
 }
 
+// Get user data by email
 async function userdata(email) {
-  const customer = await db.collection("users").findOne({ email: email });
-  return customer;
-}
-
-//all users
-function all() {
-  return new Promise(async (resolve, reject) => {
-    const customers = await db.collection("users").find({}).toArray();
-
-    //return customers if any are found else if nothing is found then return an error
-    return customers ? resolve(customers) : reject(customers);
+  return new Promise((resolve, reject) => {
+    withDB((db) => {
+      const customer = db.collection("users").findOne({ email: email });
+      resolve(customer);
+    });
   });
 }
 
-//verify user
+// Get all users
+function all() {
+  return new Promise((resolve, reject) => {
+    withDB((db) => {
+      const customers = db.collection("users").find({}).toArray();
+      resolve(customers);
+    });
+  });
+}
+
+// Verify user by email
 function login(email) {
   return new Promise((resolve, reject) => {
-    const collection = db
-      .collection("users")
-      .findOne({ email: email })
-      .then((doc) => resolve(doc))
-      .catch((err) => reject(err));
+    withDB((db) => {
+      const collection = db.collection("users");
+      const doc = collection.findOne({ email: email });
+      resolve(doc);
+    });
   });
 }
 
+// Deposit amount for a user
 function deposit(email, amount) {
   return new Promise((resolve, reject) => {
-    const user = db
-      .collection("users")
-      .findOne({ email: email })
-      .then((doc) => {
-        db.collection("users")
-          .updateOne({ email: email }, { $set: { balance: Number(doc?.balance ?? 0) + Number(amount) } })
-          .then((res) => {
-            resolve(db.collection("users").findOne({ email: email }));
-          });
-      })
-      .catch((err) => {
-        reject(err);
-      });
+    withDB((db) => {
+      const collection = db.collection("users");
+      const user = collection.findOne({ email: email });
+      const newBalance = Number(user.balance ?? 0) + Number(amount);
+      collection
+        .updateOne({ email: email }, { $set: { balance: newBalance } })
+        .then((res) => {
+          resolve(collection.findOne({ email: email }));
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    });
   });
 }
 
+// Withdraw amount for a user
 async function withdraw(email, amount) {
-  //get the user
-  const user = await db.collection("users").findOne({ email: email });
+  const user = await withDB((db) => {
+    return db.collection("users").findOne({ email: email });
+  });
 
   if (Number(amount) < 0) {
-    throw Error("Error: amount must be a positive number");
+    throw new Error("Error: amount must be a positive number");
   }
   if (!user) {
-    throw Error("Error: no user found");
+    throw new Error("Error: no user found");
   }
 
   let { balance } = user;
 
   if (Number(amount) > balance) {
-    throw Error("Error: amount cannot exceed the existing balance");
+    throw new Error("Error: amount cannot exceed the existing balance");
   }
 
-  //calculate the new balance
   balance = Number(balance) - Number(amount);
 
-  //update the balance
-  await db.collection("users").updateOne({ email: email }, { $set: { balance } });
+  await withDB((db) => {
+    db.collection("users").updateOne({ email: email }, { $set: { balance } });
+  });
 
-  //return the user with the new balance
   return { ...user, balance };
-}
-
+};
 module.exports = { create, all, login, deposit, withdraw, userdata };
