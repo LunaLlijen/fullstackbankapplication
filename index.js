@@ -20,12 +20,16 @@ app.get('/account/create/:name/:email/:password', function (req, res) {
 
 // all user data
 app.get('/account/userdata/:email/:password', function (req, res) {
-    dal.userdata().
-        then((docs) => {
-        console.log(docs);
-        res.send(docs);
-    })
-})
+    dal.userdata(req.params.email)
+        .then((user) => {
+            // console.log(user);
+            res.send(user);
+        })
+        .catch((error) => {
+            console.error(error);
+            res.sendStatus(500);
+        });
+});
 
 // all accounts
 app.get('/account/all', function (req, res) {
