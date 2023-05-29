@@ -3,8 +3,6 @@ const url = 'mongodb+srv://Jenni:Mongo1988@fullbank.kyp8jiz.mongodb.net/?retryWr
 let db = null;
 
 //connect to mongodb
-
-console.log("dal loaded");
 MongoClient.connect(url, { useUnifiedTopology: true })
   .then((client) => {
     db = client.db("Fullbank");
